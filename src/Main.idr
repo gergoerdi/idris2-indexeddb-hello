@@ -4,6 +4,7 @@ import JS
 import Web.Dom
 import Web.Html
 import Web.Raw.IndexedDB
+import Web.Raw.Css
 
 %foreign "browser:lambda:(w) => w.indexedDB"
 prim__indexedDB : Window -> IDBFactory
@@ -70,17 +71,34 @@ saveToDb db name x done = do
 
 main : IO ()
 main = runJS $ do
-  conn <- castingTo "IndexedDB" $ IDBFactory.open_ (prim__indexedDB !window) "hu.erdi.pokol" (Def 1)
+  onclick !window !> \ev => do
+    Just el <- the (Maybe ?) . (castTo HTMLElement =<<) <$> target ev
+      | _ => pure ()
+    when !(contains !(classList el) "modal") $
+      ignore $ CSSStyleDeclaration.removeProperty !(style el) "display"
+
+  Just save <- castElementById HTMLAnchorElement "btn-save"
+    | _ => throwError $ IsNothing "btn-save"
+  Just load <- castElementById HTMLAnchorElement "btn-load"
+    | _ => throwError $ IsNothing "btn-load"
+  Just loadSection <- castElementById HTMLElement "sec-load"
+    | _ => throwError $ IsNothing "sec-load"
+
+  conn <- castingTo "IndexedDB" $ IDBFactory.open_ (prim__indexedDB !window) "hu.erdi.hello-indexeddb" (Def 1)
   onupgradeneeded conn ?> do -- TODO
     db <- castingTo "IndexedDB" $ result conn
     params <- IDBObjectStoreParameters.new (Def Nothing) (Def True)
     store <- createObjectStore db "saves" (Def params)
     pure ()
   onsuccess conn ?> do
-    db <- castingTo "IndexedDB" $ result conn
-    let saveGame = MkSaveGame !new 1
-    saveToDb db "saves" (MkAny . toJSON $ saveGame) $ printLn "Save done"
-    listFromDb db "saves" $ \xs => do
-      traceConsole xs $ pure ()
+    -- db <- castingTo "IndexedDB" $ result conn
+    onclick save ?> do
+      printLn "Save"
+    onclick load ?> do
+      CSSStyleDeclaration.setProperty' !(style loadSection) "display" "block"
+    -- let saveGame = MkSaveGame !new 1
+    -- saveToDb db "saves" (MkAny . toJSON $ saveGame) $ printLn "Save done"
+    -- listFromDb db "saves" $ \xs => do
+    --   traceConsole xs $ pure ()
     pure ()
   pure ()
